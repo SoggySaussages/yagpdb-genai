@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS genai_configs (
 	base_cmd_enabled BOOL NOT NULL
 );
 `, `
+ALTER TABLE genai_configs ADD COLUMN IF NOT EXISTS max_tokens BIGINT NOT NULL DEFAULT -1;
+`, `
 CREATE TABLE IF NOT EXISTS genai_commands (
 	id BIGINT NOT NULL,
 	guild_id BIGINT NOT NULL,
