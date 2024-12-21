@@ -10,7 +10,6 @@ import (
 	"strconv"
 
 	google "cloud.google.com/go/vertexai/genai"
-	"github.com/botlabs-gg/yagpdb/v2/lib/dstate"
 	"google.golang.org/api/option"
 )
 
@@ -42,6 +41,12 @@ func (p GenAIProviderGoogle) KeyRequired() bool {
 	return true
 }
 
+var globalConfigGoogle = &GenAIProviderGlobalConfig{}
+
+func (p GenAIProviderGoogle) GlobalConfig() *GenAIProviderGlobalConfig {
+	return globalConfigGoogle
+}
+
 // ~ accurate as of Dec 2024
 const CharacterCountToTokenRatioGoogle = 4 / 1
 
@@ -53,24 +58,15 @@ type projectIDFromCredentials struct {
 	ProjectID string `json:"project_id"`
 }
 
-func (p GenAIProviderGoogle) getCredentials(gs *dstate.GuildState) (projectID string, credentials []byte) {
-	key, err := getAPIToken(gs)
-	if err != nil {
-		if err == ErrorNoAPIKey || err == ErrorAPIKeyInvalid {
-			return "", nil
-		}
-		logger.Error(err)
-		return "", nil
-	}
-
+func (p GenAIProviderGoogle) getCredentials(credentialsFile string) (projectID string, credentials []byte) {
 	var projectIDStruct projectIDFromCredentials
-	json.Unmarshal([]byte(key), &projectIDStruct)
-	return projectIDStruct.ProjectID, []byte(key)
+	json.Unmarshal([]byte(credentialsFile), &projectIDStruct)
+	return projectIDStruct.ProjectID, []byte(credentialsFile)
 }
 
-func (p GenAIProviderGoogle) EstimateTokens(combinedInput string, maxTokens int64) (inputEstimatedTokens, outputMaxTokens int64) {
+func (p GenAIProviderGoogle) EstimateTokens(model, combinedInput string, maxTokens int64) (inputEstimatedTokens, outputMaxTokens int64) {
 	inputEstimatedTokens = int64(len(combinedInput) / CharacterCountToTokenRatioOpenAI)
-	outputMaxTokens = maxTokens - inputEstimatedTokens
+	outputMaxTokens = maxTokens - (inputEstimatedTokens / 4)
 	return
 }
 
@@ -81,14 +77,14 @@ func (p GenAIProviderGoogle) client(projectID string, credentials []byte) (*goog
 	return google.NewClient(context.Background(), projectID, "us-central1", option.WithCredentialsJSON(credentials))
 }
 
-func (p GenAIProviderGoogle) ValidateAPIToken(gs *dstate.GuildState, token string) error {
+func (p GenAIProviderGoogle) ValidateAPIToken(key string) error {
 	projectIDStruct := projectIDFromCredentials{}
-	err := json.Unmarshal([]byte(token), &projectIDStruct)
+	err := json.Unmarshal([]byte(key), &projectIDStruct)
 	if err != nil {
 		return fmt.Errorf("error unmarshalling to credentials file: %w", err)
 	}
 
-	client, err := p.client(projectIDStruct.ProjectID, []byte(token))
+	client, err := p.client(projectIDStruct.ProjectID, []byte(key))
 	if err != nil {
 		return fmt.Errorf("error creating client: %w", err)
 	}
@@ -98,40 +94,12 @@ func (p GenAIProviderGoogle) ValidateAPIToken(gs *dstate.GuildState, token strin
 	return err
 }
 
-func (p GenAIProviderGoogle) BasicCompletion(gs *dstate.GuildState, systemMsg, userMsg string, maxTokens int64, nsfw bool) (*GenAIResponse, *GenAIResponseUsage, error) {
-	input := &GenAIInput{BotSystemMessage: BotSystemMessagePromptGeneric + BotSystemMessagePromptAppendSingleResponseContext, SystemMessage: systemMsg, UserMessage: userMsg, MaxTokens: maxTokens}
-	if nsfw {
-		input.BotSystemMessage = fmt.Sprintf("%s\n%s", input.BotSystemMessage, BotSystemMessagePromptAppendNSFW)
-	} else {
-		input.BotSystemMessage = fmt.Sprintf("%s\n%s", input.BotSystemMessage, BotSystemMessagePromptAppendNonNSFW)
-	}
-	return p.ComplexCompletion(gs, input)
-}
-
-func (p GenAIProviderGoogle) ComplexCompletion(gs *dstate.GuildState, input *GenAIInput) (*GenAIResponse, *GenAIResponseUsage, error) {
-	config, err := GetConfig(gs.ID)
+func (p GenAIProviderGoogle) ComplexCompletion(model, key string, input *GenAIInput) (*GenAIResponse, *GenAIResponseUsage, error) {
+	client, err := p.client(p.getCredentials(key))
 	if err != nil {
-		return nil, nil, err
-	}
-	if !config.Enabled {
-		return &GenAIResponse{}, &GenAIResponseUsage{}, err
-	}
-
-	client, err := p.client(p.getCredentials(gs))
-	if err != nil {
-		return nil, nil, fmt.Errorf("error creating client: %w", err)
+		return &GenAIResponse{}, &GenAIResponseUsage{}, fmt.Errorf("error creating client: %w", err)
 	}
 	defer client.Close()
-
-	model := config.Model
-	if input.ModelOverride != "" {
-		for _, v := range *p.ModelMap() {
-			if v == input.ModelOverride {
-				model = input.ModelOverride
-				break
-			}
-		}
-	}
 
 	gemini := client.GenerativeModel(model)
 	presencePenalty := float32(0.05)
@@ -194,10 +162,16 @@ func (p GenAIProviderGoogle) ComplexCompletion(gs *dstate.GuildState, input *Gen
 		}
 	}
 
+	usage := &GenAIResponseUsage{}
+
 	resp, err := gemini.GenerateContent(context.Background(), prompt)
+	if resp != nil && resp.UsageMetadata.PromptTokenCount != 0 || resp.UsageMetadata.CandidatesTokenCount != 0 {
+		usage.InputTokens = int64(resp.UsageMetadata.PromptTokenCount)
+		usage.OutputTokens = int64(resp.UsageMetadata.CandidatesTokenCount)
+	}
 	if err != nil {
 		logger.Error(err)
-		return nil, nil, fmt.Errorf("error generating content: %w", err)
+		return &GenAIResponse{}, usage, fmt.Errorf("error generating content: %w", err)
 	}
 
 	choice := resp.Candidates[0]
@@ -220,20 +194,17 @@ func (p GenAIProviderGoogle) ComplexCompletion(gs *dstate.GuildState, input *Gen
 	}
 
 	return &GenAIResponse{
-			Content:   content,
-			Functions: &functionResponse,
-		}, &GenAIResponseUsage{
-			InputTokens:  int64(resp.UsageMetadata.PromptTokenCount),
-			OutputTokens: int64(resp.UsageMetadata.CandidatesTokenCount),
-		}, nil
+		Content:   content,
+		Functions: &functionResponse,
+	}, usage, nil
 }
 
-func (p GenAIProviderGoogle) ModerateMessage(gs *dstate.GuildState, message string) (*GenAIModerationCategoryProbability, *GenAIResponseUsage, error) {
+func (p GenAIProviderGoogle) ModerateMessage(model, key string, message string) (*GenAIModerationCategoryProbability, *GenAIResponseUsage, error) {
 	input := CustomModerateFunction
 	input.UserMessage = message
 	input.MaxTokens = 96
 
-	r, u, err := p.ComplexCompletion(gs, &input)
+	r, u, err := p.ComplexCompletion(model, key, &input)
 	if err != nil {
 		logger.Error(err)
 		return &GenAIModerationCategoryProbability{}, u, nil

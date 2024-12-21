@@ -33,6 +33,7 @@ func (p *Plugin) AddCommands() {
 }
 
 func (p *Plugin) BotInit() {
+	setProvidersGlobalConfigs()
 	generateFormattedModCategoryList()
 	genCustomModerateFuncArgs()
 
@@ -50,13 +51,13 @@ func (p *Plugin) BotInit() {
 	eventsystem.AddHandlerAsyncLastLegacy(p, bot.ConcurrentEventHandler(HandleMessageCreate), eventsystem.EventMessageCreate)
 }
 
-func GenAIProviderFromID(id int) GenAIProvider {
+func GenAIProviderFromID(id int) GenAIProviderGeneric {
 	for _, p := range GenAIProviders {
 		if p.ID() == GenAIProviderID(id) {
-			return p
+			return GenAIProviderGeneric{p}
 		}
 	}
-	return GenAIProviders[0]
+	return GenAIProviderGeneric{GenAIProviders[0]}
 }
 
 var baseCmd = &commands.YAGCommand{
@@ -294,20 +295,39 @@ func decryptAPIToken(gs *dstate.GuildState, encryptedToken []byte) (string, erro
 
 var ErrorNoAPIKey = errors.New("no API token set")
 
-func getAPIToken(gs *dstate.GuildState) (string, error) {
+func getAPIToken(gs *dstate.GuildState) (*models.GenaiConfig, string, error) {
 	config, err := GetConfig(gs.ID)
 	if err != nil {
 		logger.WithError(err).WithField("guild", gs.ID).Error("Failed retrieving openai config")
-		return "", err
+		return config, "", err
 	}
 
 	if !config.Enabled {
-		return "", nil
+		return config, "", nil
 	}
 
 	if len(config.Key) == 0 {
-		return "", ErrorNoAPIKey
+		return config, "", ErrorNoAPIKey
 	}
 
-	return decryptAPIToken(gs, config.Key)
+	key, err := decryptAPIToken(gs, config.Key)
+	return config, key, err
+}
+
+// lists all the providers supported by the plugin
+func ListProviders() (providers []string) {
+	for _, p := range GenAIProviders {
+		providers = append(providers, p.String())
+	}
+	return
+}
+
+// lists all the providers permitted by the global config
+func ListConfiguredProviders() (providers []string) {
+	for _, p := range GenAIProviders {
+		if strings.Contains(confProvidersEnabled.GetString(), p.String()) || p.ID() == GenAIProviderID(confProvidersOverride.GetInt()) {
+			providers = append(providers, p.String())
+		}
+	}
+	return
 }
