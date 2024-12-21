@@ -40,6 +40,8 @@ type GenaiCommand struct {
 	ChannelsWhitelistMode   bool              `boil:"channels_whitelist_mode" json:"channels_whitelist_mode" toml:"channels_whitelist_mode" yaml:"channels_whitelist_mode"`
 	Roles                   types.Int64Array  `boil:"roles" json:"roles,omitempty" toml:"roles" yaml:"roles,omitempty"`
 	RolesWhitelistMode      bool              `boil:"roles_whitelist_mode" json:"roles_whitelist_mode" toml:"roles_whitelist_mode" yaml:"roles_whitelist_mode"`
+	MonthTokenUsageToDate   int64             `boil:"month_token_usage_to_date" json:"month_token_usage_to_date" toml:"month_token_usage_to_date" yaml:"month_token_usage_to_date"`
+	TokenUsageLastReset     time.Time         `boil:"token_usage_last_reset" json:"token_usage_last_reset" toml:"token_usage_last_reset" yaml:"token_usage_last_reset"`
 
 	R *genaiCommandR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L genaiCommandL  `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -62,6 +64,8 @@ var GenaiCommandColumns = struct {
 	ChannelsWhitelistMode   string
 	Roles                   string
 	RolesWhitelistMode      string
+	MonthTokenUsageToDate   string
+	TokenUsageLastReset     string
 }{
 	ID:                      "id",
 	GuildID:                 "guild_id",
@@ -79,6 +83,8 @@ var GenaiCommandColumns = struct {
 	ChannelsWhitelistMode:   "channels_whitelist_mode",
 	Roles:                   "roles",
 	RolesWhitelistMode:      "roles_whitelist_mode",
+	MonthTokenUsageToDate:   "month_token_usage_to_date",
+	TokenUsageLastReset:     "token_usage_last_reset",
 }
 
 var GenaiCommandTableColumns = struct {
@@ -98,6 +104,8 @@ var GenaiCommandTableColumns = struct {
 	ChannelsWhitelistMode   string
 	Roles                   string
 	RolesWhitelistMode      string
+	MonthTokenUsageToDate   string
+	TokenUsageLastReset     string
 }{
 	ID:                      "genai_commands.id",
 	GuildID:                 "genai_commands.guild_id",
@@ -115,6 +123,8 @@ var GenaiCommandTableColumns = struct {
 	ChannelsWhitelistMode:   "genai_commands.channels_whitelist_mode",
 	Roles:                   "genai_commands.roles",
 	RolesWhitelistMode:      "genai_commands.roles_whitelist_mode",
+	MonthTokenUsageToDate:   "genai_commands.month_token_usage_to_date",
+	TokenUsageLastReset:     "genai_commands.token_usage_last_reset",
 }
 
 // Generated where
@@ -242,6 +252,27 @@ func (w whereHelpertypes_Int64Array) GTE(x types.Int64Array) qm.QueryMod {
 func (w whereHelpertypes_Int64Array) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
 func (w whereHelpertypes_Int64Array) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
 
+type whereHelpertime_Time struct{ field string }
+
+func (w whereHelpertime_Time) EQ(x time.Time) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.EQ, x)
+}
+func (w whereHelpertime_Time) NEQ(x time.Time) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.NEQ, x)
+}
+func (w whereHelpertime_Time) LT(x time.Time) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LT, x)
+}
+func (w whereHelpertime_Time) LTE(x time.Time) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LTE, x)
+}
+func (w whereHelpertime_Time) GT(x time.Time) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GT, x)
+}
+func (w whereHelpertime_Time) GTE(x time.Time) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GTE, x)
+}
+
 var GenaiCommandWhere = struct {
 	ID                      whereHelperint64
 	GuildID                 whereHelperint64
@@ -259,6 +290,8 @@ var GenaiCommandWhere = struct {
 	ChannelsWhitelistMode   whereHelperbool
 	Roles                   whereHelpertypes_Int64Array
 	RolesWhitelistMode      whereHelperbool
+	MonthTokenUsageToDate   whereHelperint64
+	TokenUsageLastReset     whereHelpertime_Time
 }{
 	ID:                      whereHelperint64{field: "\"genai_commands\".\"id\""},
 	GuildID:                 whereHelperint64{field: "\"genai_commands\".\"guild_id\""},
@@ -276,6 +309,8 @@ var GenaiCommandWhere = struct {
 	ChannelsWhitelistMode:   whereHelperbool{field: "\"genai_commands\".\"channels_whitelist_mode\""},
 	Roles:                   whereHelpertypes_Int64Array{field: "\"genai_commands\".\"roles\""},
 	RolesWhitelistMode:      whereHelperbool{field: "\"genai_commands\".\"roles_whitelist_mode\""},
+	MonthTokenUsageToDate:   whereHelperint64{field: "\"genai_commands\".\"month_token_usage_to_date\""},
+	TokenUsageLastReset:     whereHelpertime_Time{field: "\"genai_commands\".\"token_usage_last_reset\""},
 }
 
 // GenaiCommandRels is where relationship names are stored.
@@ -295,9 +330,9 @@ func (*genaiCommandR) NewStruct() *genaiCommandR {
 type genaiCommandL struct{}
 
 var (
-	genaiCommandAllColumns            = []string{"id", "guild_id", "enabled", "triggers", "prompt", "allow_input", "whitelisted_context", "max_tokens", "autodelete_response", "autodelete_trigger", "autodelete_response_delay", "autodelete_trigger_delay", "channels", "channels_whitelist_mode", "roles", "roles_whitelist_mode"}
+	genaiCommandAllColumns            = []string{"id", "guild_id", "enabled", "triggers", "prompt", "allow_input", "whitelisted_context", "max_tokens", "autodelete_response", "autodelete_trigger", "autodelete_response_delay", "autodelete_trigger_delay", "channels", "channels_whitelist_mode", "roles", "roles_whitelist_mode", "month_token_usage_to_date", "token_usage_last_reset"}
 	genaiCommandColumnsWithoutDefault = []string{"id", "guild_id", "enabled", "triggers", "prompt", "allow_input", "whitelisted_context", "max_tokens", "autodelete_response", "autodelete_trigger", "autodelete_response_delay", "autodelete_trigger_delay", "channels_whitelist_mode", "roles_whitelist_mode"}
-	genaiCommandColumnsWithDefault    = []string{"channels", "roles"}
+	genaiCommandColumnsWithDefault    = []string{"channels", "roles", "month_token_usage_to_date", "token_usage_last_reset"}
 	genaiCommandPrimaryKeyColumns     = []string{"guild_id", "id"}
 	genaiCommandGeneratedColumns      = []string{}
 )

@@ -23,52 +23,62 @@ import (
 
 // GenaiConfig is an object representing the database table.
 type GenaiConfig struct {
-	GuildID        int64  `boil:"guild_id" json:"guild_id" toml:"guild_id" yaml:"guild_id"`
-	Enabled        bool   `boil:"enabled" json:"enabled" toml:"enabled" yaml:"enabled"`
-	Provider       int    `boil:"provider" json:"provider" toml:"provider" yaml:"provider"`
-	Model          string `boil:"model" json:"model" toml:"model" yaml:"model"`
-	Key            []byte `boil:"key" json:"key" toml:"key" yaml:"key"`
-	BaseCMDEnabled bool   `boil:"base_cmd_enabled" json:"base_cmd_enabled" toml:"base_cmd_enabled" yaml:"base_cmd_enabled"`
-	MaxTokens      int64  `boil:"max_tokens" json:"max_tokens" toml:"max_tokens" yaml:"max_tokens"`
+	GuildID               int64     `boil:"guild_id" json:"guild_id" toml:"guild_id" yaml:"guild_id"`
+	Enabled               bool      `boil:"enabled" json:"enabled" toml:"enabled" yaml:"enabled"`
+	Provider              int       `boil:"provider" json:"provider" toml:"provider" yaml:"provider"`
+	Model                 string    `boil:"model" json:"model" toml:"model" yaml:"model"`
+	Key                   []byte    `boil:"key" json:"key" toml:"key" yaml:"key"`
+	BaseCMDEnabled        bool      `boil:"base_cmd_enabled" json:"base_cmd_enabled" toml:"base_cmd_enabled" yaml:"base_cmd_enabled"`
+	MaxTokens             int64     `boil:"max_tokens" json:"max_tokens" toml:"max_tokens" yaml:"max_tokens"`
+	MonthTokenUsageToDate int64     `boil:"month_token_usage_to_date" json:"month_token_usage_to_date" toml:"month_token_usage_to_date" yaml:"month_token_usage_to_date"`
+	TokenUsageLastReset   time.Time `boil:"token_usage_last_reset" json:"token_usage_last_reset" toml:"token_usage_last_reset" yaml:"token_usage_last_reset"`
 
 	R *genaiConfigR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L genaiConfigL  `boil:"-" json:"-" toml:"-" yaml:"-"`
 }
 
 var GenaiConfigColumns = struct {
-	GuildID        string
-	Enabled        string
-	Provider       string
-	Model          string
-	Key            string
-	BaseCMDEnabled string
-	MaxTokens      string
+	GuildID               string
+	Enabled               string
+	Provider              string
+	Model                 string
+	Key                   string
+	BaseCMDEnabled        string
+	MaxTokens             string
+	MonthTokenUsageToDate string
+	TokenUsageLastReset   string
 }{
-	GuildID:        "guild_id",
-	Enabled:        "enabled",
-	Provider:       "provider",
-	Model:          "model",
-	Key:            "key",
-	BaseCMDEnabled: "base_cmd_enabled",
-	MaxTokens:      "max_tokens",
+	GuildID:               "guild_id",
+	Enabled:               "enabled",
+	Provider:              "provider",
+	Model:                 "model",
+	Key:                   "key",
+	BaseCMDEnabled:        "base_cmd_enabled",
+	MaxTokens:             "max_tokens",
+	MonthTokenUsageToDate: "month_token_usage_to_date",
+	TokenUsageLastReset:   "token_usage_last_reset",
 }
 
 var GenaiConfigTableColumns = struct {
-	GuildID        string
-	Enabled        string
-	Provider       string
-	Model          string
-	Key            string
-	BaseCMDEnabled string
-	MaxTokens      string
+	GuildID               string
+	Enabled               string
+	Provider              string
+	Model                 string
+	Key                   string
+	BaseCMDEnabled        string
+	MaxTokens             string
+	MonthTokenUsageToDate string
+	TokenUsageLastReset   string
 }{
-	GuildID:        "genai_configs.guild_id",
-	Enabled:        "genai_configs.enabled",
-	Provider:       "genai_configs.provider",
-	Model:          "genai_configs.model",
-	Key:            "genai_configs.key",
-	BaseCMDEnabled: "genai_configs.base_cmd_enabled",
-	MaxTokens:      "genai_configs.max_tokens",
+	GuildID:               "genai_configs.guild_id",
+	Enabled:               "genai_configs.enabled",
+	Provider:              "genai_configs.provider",
+	Model:                 "genai_configs.model",
+	Key:                   "genai_configs.key",
+	BaseCMDEnabled:        "genai_configs.base_cmd_enabled",
+	MaxTokens:             "genai_configs.max_tokens",
+	MonthTokenUsageToDate: "genai_configs.month_token_usage_to_date",
+	TokenUsageLastReset:   "genai_configs.token_usage_last_reset",
 }
 
 // Generated where
@@ -83,21 +93,25 @@ func (w whereHelper__byte) GT(x []byte) qm.QueryMod  { return qmhelper.Where(w.f
 func (w whereHelper__byte) GTE(x []byte) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.GTE, x) }
 
 var GenaiConfigWhere = struct {
-	GuildID        whereHelperint64
-	Enabled        whereHelperbool
-	Provider       whereHelperint
-	Model          whereHelperstring
-	Key            whereHelper__byte
-	BaseCMDEnabled whereHelperbool
-	MaxTokens      whereHelperint64
+	GuildID               whereHelperint64
+	Enabled               whereHelperbool
+	Provider              whereHelperint
+	Model                 whereHelperstring
+	Key                   whereHelper__byte
+	BaseCMDEnabled        whereHelperbool
+	MaxTokens             whereHelperint64
+	MonthTokenUsageToDate whereHelperint64
+	TokenUsageLastReset   whereHelpertime_Time
 }{
-	GuildID:        whereHelperint64{field: "\"genai_configs\".\"guild_id\""},
-	Enabled:        whereHelperbool{field: "\"genai_configs\".\"enabled\""},
-	Provider:       whereHelperint{field: "\"genai_configs\".\"provider\""},
-	Model:          whereHelperstring{field: "\"genai_configs\".\"model\""},
-	Key:            whereHelper__byte{field: "\"genai_configs\".\"key\""},
-	BaseCMDEnabled: whereHelperbool{field: "\"genai_configs\".\"base_cmd_enabled\""},
-	MaxTokens:      whereHelperint64{field: "\"genai_configs\".\"max_tokens\""},
+	GuildID:               whereHelperint64{field: "\"genai_configs\".\"guild_id\""},
+	Enabled:               whereHelperbool{field: "\"genai_configs\".\"enabled\""},
+	Provider:              whereHelperint{field: "\"genai_configs\".\"provider\""},
+	Model:                 whereHelperstring{field: "\"genai_configs\".\"model\""},
+	Key:                   whereHelper__byte{field: "\"genai_configs\".\"key\""},
+	BaseCMDEnabled:        whereHelperbool{field: "\"genai_configs\".\"base_cmd_enabled\""},
+	MaxTokens:             whereHelperint64{field: "\"genai_configs\".\"max_tokens\""},
+	MonthTokenUsageToDate: whereHelperint64{field: "\"genai_configs\".\"month_token_usage_to_date\""},
+	TokenUsageLastReset:   whereHelpertime_Time{field: "\"genai_configs\".\"token_usage_last_reset\""},
 }
 
 // GenaiConfigRels is where relationship names are stored.
@@ -117,9 +131,9 @@ func (*genaiConfigR) NewStruct() *genaiConfigR {
 type genaiConfigL struct{}
 
 var (
-	genaiConfigAllColumns            = []string{"guild_id", "enabled", "provider", "model", "key", "base_cmd_enabled", "max_tokens"}
+	genaiConfigAllColumns            = []string{"guild_id", "enabled", "provider", "model", "key", "base_cmd_enabled", "max_tokens", "month_token_usage_to_date", "token_usage_last_reset"}
 	genaiConfigColumnsWithoutDefault = []string{"guild_id", "enabled", "provider", "model", "key", "base_cmd_enabled"}
-	genaiConfigColumnsWithDefault    = []string{"max_tokens"}
+	genaiConfigColumnsWithDefault    = []string{"max_tokens", "month_token_usage_to_date", "token_usage_last_reset"}
 	genaiConfigPrimaryKeyColumns     = []string{"guild_id"}
 	genaiConfigGeneratedColumns      = []string{}
 )
