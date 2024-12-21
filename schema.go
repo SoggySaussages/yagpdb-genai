@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS genai_configs (
 `, `
 ALTER TABLE genai_configs ADD COLUMN IF NOT EXISTS max_tokens BIGINT NOT NULL DEFAULT -1;
 `, `
+ALTER TABLE genai_configs ADD COLUMN IF NOT EXISTS month_token_usage_to_date BIGINT NOT NULL DEFAULT 0;
+`, `
+ALTER TABLE genai_configs ADD COLUMN IF NOT EXISTS token_usage_last_reset DATE NOT NULL DEFAULT '0001-01-01';
+`, `
 CREATE TABLE IF NOT EXISTS genai_commands (
 	id BIGINT NOT NULL,
 	guild_id BIGINT NOT NULL,
@@ -39,6 +43,10 @@ CREATE TABLE IF NOT EXISTS genai_commands (
 
 	PRIMARY KEY(guild_id, id)
 );
+`, `
+ALTER TABLE genai_commands ADD COLUMN IF NOT EXISTS month_token_usage_to_date BIGINT NOT NULL DEFAULT 0;
+`, `
+ALTER TABLE genai_commands ADD COLUMN IF NOT EXISTS token_usage_last_reset DATE NOT NULL DEFAULT '0001-01-01';
 `, `
 CREATE INDEX IF NOT EXISTS genai_commands_guild_idx ON genai_commands(guild_id);
 `}
