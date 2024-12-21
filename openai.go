@@ -3,13 +3,11 @@ package genai
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"reflect"
 	"slices"
 	"strings"
 
-	"github.com/botlabs-gg/yagpdb/v2/lib/dstate"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/shared"
@@ -61,9 +59,9 @@ func (p GenAIProviderOpenAI) EstimateTokens(combinedInput string, maxTokens int6
 	return
 }
 
-func (p GenAIProviderOpenAI) ValidateAPIToken(gs *dstate.GuildState, token string) error {
+func (p GenAIProviderOpenAI) ValidateAPIToken(key string) error {
 	// make a really cheap (%0.02 of a cent) call to test the key
-	client := openai.NewClient(option.WithAPIKey(token))
+	client := openai.NewClient(option.WithAPIKey(key))
 	_, err := client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
 		Messages:            openai.F([]openai.ChatCompletionMessageParamUnion{openai.UserMessage("1")}),
 		Model:               openai.F(p.DefaultModel()),
@@ -72,45 +70,19 @@ func (p GenAIProviderOpenAI) ValidateAPIToken(gs *dstate.GuildState, token strin
 	return err
 }
 
-func (p GenAIProviderOpenAI) BasicCompletion(gs *dstate.GuildState, systemMsg, userMsg string, maxTokens int64, nsfw bool) (*GenAIResponse, *GenAIResponseUsage, error) {
-	input := &GenAIInput{BotSystemMessage: BotSystemMessagePromptGeneric + BotSystemMessagePromptAppendSingleResponseContext, SystemMessage: systemMsg, UserMessage: userMsg, MaxTokens: maxTokens}
-	if nsfw {
-		input.BotSystemMessage = fmt.Sprintf("%s\n%s", input.BotSystemMessage, BotSystemMessagePromptAppendNSFW)
-	} else {
-		input.BotSystemMessage = fmt.Sprintf("%s\n%s", input.BotSystemMessage, BotSystemMessagePromptAppendNonNSFW)
-	}
-	return p.ComplexCompletion(gs, input)
-}
-
 var ModelsNotSupportingSystemRoleMessages = []string{openai.ChatModelO1Mini, openai.ChatModelO1Preview}
 
-func (p GenAIProviderOpenAI) ComplexCompletion(gs *dstate.GuildState, input *GenAIInput) (*GenAIResponse, *GenAIResponseUsage, error) {
-	key, err := getAPIToken(gs)
-	if err != nil {
-		if err == ErrorNoAPIKey {
-			return &GenAIResponse{Content: "Please set your API key on the dashboard to use Generative AI."}, &GenAIResponseUsage{}, nil
-		}
-		if err == ErrorAPIKeyInvalid {
-			return &GenAIResponse{Content: err.Error()}, &GenAIResponseUsage{}, nil
-		}
-		return nil, nil, err
-	}
-
+func (p GenAIProviderOpenAI) ComplexCompletion(model, key string, input *GenAIInput) (*GenAIResponse, *GenAIResponseUsage, error) {
 	messages := []openai.ChatCompletionMessageParamUnion{}
 
-	config, err := GetConfig(gs.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if slices.Contains(ModelsNotSupportingSystemRoleMessages, config.Model) {
+	if slices.Contains(ModelsNotSupportingSystemRoleMessages, model) {
 		messages = append(messages, openai.UserMessage(input.BotSystemMessage))
 	} else {
 		messages = append(messages, openai.SystemMessage(input.BotSystemMessage))
 	}
 
 	if input.SystemMessage != "" {
-		if slices.Contains(ModelsNotSupportingSystemRoleMessages, config.Model) {
+		if slices.Contains(ModelsNotSupportingSystemRoleMessages, model) {
 			messages = append(messages, openai.UserMessage(input.SystemMessage))
 		} else {
 			messages = append(messages, openai.SystemMessage(input.SystemMessage))
@@ -143,16 +115,6 @@ func (p GenAIProviderOpenAI) ComplexCompletion(gs *dstate.GuildState, input *Gen
 					}),
 				}),
 			})
-		}
-	}
-
-	model := config.Model
-	if input.ModelOverride != "" {
-		for _, v := range *p.ModelMap() {
-			if v == input.ModelOverride {
-				model = input.ModelOverride
-				break
-			}
 		}
 	}
 
@@ -197,15 +159,7 @@ func (p GenAIProviderOpenAI) ComplexCompletion(gs *dstate.GuildState, input *Gen
 		}, nil
 }
 
-func (p GenAIProviderOpenAI) ModerateMessage(gs *dstate.GuildState, message string) (*GenAIModerationCategoryProbability, *GenAIResponseUsage, error) {
-	key, err := getAPIToken(gs)
-	if err != nil {
-		if err == ErrorNoAPIKey || err == ErrorAPIKeyInvalid {
-			return &GenAIModerationCategoryProbability{}, nil, nil
-		}
-		return nil, nil, err
-	}
-
+func (p GenAIProviderOpenAI) ModerateMessage(model, key string, message string) (*GenAIModerationCategoryProbability, *GenAIResponseUsage, error) {
 	moderationParams := openai.ModerationNewParams{
 		Input: openai.F[openai.ModerationNewParamsInputUnion](shared.UnionString(message)),
 		Model: openai.F(openai.ModerationModelOmniModerationLatest),

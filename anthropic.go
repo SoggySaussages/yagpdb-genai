@@ -50,31 +50,21 @@ func (p GenAIProviderAnthropic) CharacterTokenRatio() int {
 	return CharacterCountToTokenRatioAnthropic
 }
 
-func (p GenAIProviderAnthropic) EstimateTokens(combinedInput string, maxTokens int64) (inputEstimatedTokens, outputMaxTokens int64) {
+func (p GenAIProviderAnthropic) EstimateTokens(model, combinedInput string, maxTokens int64) (inputEstimatedTokens, outputMaxTokens int64) {
 	inputEstimatedTokens = int64(len(combinedInput) / CharacterCountToTokenRatioAnthropic)
-	outputMaxTokens = maxTokens - inputEstimatedTokens
+	outputMaxTokens = maxTokens - (inputEstimatedTokens / 4)
 	return
 }
 
-func (p GenAIProviderAnthropic) ValidateAPIToken(gs *dstate.GuildState, token string) error {
+func (p GenAIProviderAnthropic) ValidateAPIToken(key string) error {
 	// make a really cheap call to test the key
-	client := anthropic.NewClient(option.WithAPIKey(token))
+	client := anthropic.NewClient(option.WithAPIKey(key))
 	_, err := client.Messages.New(context.Background(), anthropic.MessageNewParams{
 		Messages:  anthropic.F([]anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock("1"))}),
 		Model:     anthropic.F(p.DefaultModel()),
 		MaxTokens: anthropic.Int(1),
 	})
 	return err
-}
-
-func (p GenAIProviderAnthropic) BasicCompletion(gs *dstate.GuildState, systemMsg, userMsg string, maxTokens int64, nsfw bool) (*GenAIResponse, *GenAIResponseUsage, error) {
-	input := &GenAIInput{BotSystemMessage: BotSystemMessagePromptGeneric + BotSystemMessagePromptAppendSingleResponseContext, SystemMessage: systemMsg, UserMessage: userMsg, MaxTokens: maxTokens}
-	if nsfw {
-		input.BotSystemMessage = fmt.Sprintf("%s\n%s", input.BotSystemMessage, BotSystemMessagePromptAppendNSFW)
-	} else {
-		input.BotSystemMessage = fmt.Sprintf("%s\n%s", input.BotSystemMessage, BotSystemMessagePromptAppendNonNSFW)
-	}
-	return p.ComplexCompletion(gs, input)
 }
 
 func (p GenAIProviderAnthropic) convertToJSONSchema(args json.RawMessage) interface{} {
@@ -86,23 +76,7 @@ func (p GenAIProviderAnthropic) convertToJSONSchema(args json.RawMessage) interf
 	}`, string(args)))
 }
 
-func (p GenAIProviderAnthropic) ComplexCompletion(gs *dstate.GuildState, input *GenAIInput) (*GenAIResponse, *GenAIResponseUsage, error) {
-	key, err := getAPIToken(gs)
-	if err != nil {
-		if err == ErrorNoAPIKey {
-			return &GenAIResponse{Content: "Please set your API key on the dashboard to use Generative AI."}, &GenAIResponseUsage{}, nil
-		}
-		if err == ErrorAPIKeyInvalid {
-			return &GenAIResponse{Content: err.Error()}, &GenAIResponseUsage{}, nil
-		}
-		return nil, nil, err
-	}
-
-	config, err := GetConfig(gs.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func (p GenAIProviderAnthropic) ComplexCompletion(model, key string, input *GenAIInput) (*GenAIResponse, *GenAIResponseUsage, error) {
 	systemMessages := []anthropic.TextBlockParam{}
 
 	systemMessages = append(systemMessages, anthropic.NewTextBlock(input.BotSystemMessage))
@@ -129,16 +103,6 @@ func (p GenAIProviderAnthropic) ComplexCompletion(gs *dstate.GuildState, input *
 				Description: anthropic.String(fn.Description),
 				InputSchema: anthropic.F(inSch),
 			})
-		}
-	}
-
-	model := config.Model
-	if input.ModelOverride != "" {
-		for _, v := range *p.ModelMap() {
-			if v == input.ModelOverride {
-				model = input.ModelOverride
-				break
-			}
 		}
 	}
 
@@ -184,13 +148,11 @@ func (p GenAIProviderAnthropic) ComplexCompletion(gs *dstate.GuildState, input *
 		}, nil
 }
 
-func (p GenAIProviderAnthropic) ModerateMessage(gs *dstate.GuildState, message string) (*GenAIModerationCategoryProbability, *GenAIResponseUsage, error) {
+func (p GenAIProviderAnthropic) ModerateMessage(model, key string, message string) (*GenAIModerationCategoryProbability, *GenAIResponseUsage, error) {
 	input := CustomModerateFunction
 	input.UserMessage = message
-	input.MaxTokens = 96
-	input.ModelOverride = anthropic.ModelClaude3_5HaikuLatest
 
-	r, u, err := p.ComplexCompletion(gs, &input)
+	r, u, err := p.ComplexCompletion(anthropic.ModelClaude3_5HaikuLatest, key, &input)
 	if err != nil {
 		logger.Error(err)
 		return &GenAIModerationCategoryProbability{}, u, nil

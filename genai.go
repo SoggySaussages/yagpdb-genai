@@ -189,12 +189,11 @@ type GenAIProvider interface {
 	KeyRequired() bool
 
 	CharacterTokenRatio() int
-	EstimateTokens(combinedInput string, maxTokens int64) (inputEstimatedTokens, outputMaxCharacters int64)
+	EstimateTokens(model, combinedInput string, maxTokens int64) (inputEstimatedTokens, outputMaxCharacters int64)
 
-	ValidateAPIToken(gs *dstate.GuildState, token string) error
-	BasicCompletion(gs *dstate.GuildState, systemMsg, userMsg string, maxTokens int64, nsfw bool) (*GenAIResponse, *GenAIResponseUsage, error)
-	ComplexCompletion(gs *dstate.GuildState, input *GenAIInput) (*GenAIResponse, *GenAIResponseUsage, error)
-	ModerateMessage(gs *dstate.GuildState, message string) (*GenAIModerationCategoryProbability, *GenAIResponseUsage, error)
+	ValidateAPIToken(key string) error
+	ComplexCompletion(model, key string, input *GenAIInput) (*GenAIResponse, *GenAIResponseUsage, error)
+	ModerateMessage(model, key string, message string) (*GenAIModerationCategoryProbability, *GenAIResponseUsage, error)
 
 	WebData() *GenAIProviderWebDescriptions
 }
