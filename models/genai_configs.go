@@ -29,6 +29,7 @@ type GenaiConfig struct {
 	Model          string `boil:"model" json:"model" toml:"model" yaml:"model"`
 	Key            []byte `boil:"key" json:"key" toml:"key" yaml:"key"`
 	BaseCMDEnabled bool   `boil:"base_cmd_enabled" json:"base_cmd_enabled" toml:"base_cmd_enabled" yaml:"base_cmd_enabled"`
+	MaxTokens      int64  `boil:"max_tokens" json:"max_tokens" toml:"max_tokens" yaml:"max_tokens"`
 
 	R *genaiConfigR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L genaiConfigL  `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -41,6 +42,7 @@ var GenaiConfigColumns = struct {
 	Model          string
 	Key            string
 	BaseCMDEnabled string
+	MaxTokens      string
 }{
 	GuildID:        "guild_id",
 	Enabled:        "enabled",
@@ -48,6 +50,7 @@ var GenaiConfigColumns = struct {
 	Model:          "model",
 	Key:            "key",
 	BaseCMDEnabled: "base_cmd_enabled",
+	MaxTokens:      "max_tokens",
 }
 
 var GenaiConfigTableColumns = struct {
@@ -57,6 +60,7 @@ var GenaiConfigTableColumns = struct {
 	Model          string
 	Key            string
 	BaseCMDEnabled string
+	MaxTokens      string
 }{
 	GuildID:        "genai_configs.guild_id",
 	Enabled:        "genai_configs.enabled",
@@ -64,6 +68,7 @@ var GenaiConfigTableColumns = struct {
 	Model:          "genai_configs.model",
 	Key:            "genai_configs.key",
 	BaseCMDEnabled: "genai_configs.base_cmd_enabled",
+	MaxTokens:      "genai_configs.max_tokens",
 }
 
 // Generated where
@@ -84,6 +89,7 @@ var GenaiConfigWhere = struct {
 	Model          whereHelperstring
 	Key            whereHelper__byte
 	BaseCMDEnabled whereHelperbool
+	MaxTokens      whereHelperint64
 }{
 	GuildID:        whereHelperint64{field: "\"genai_configs\".\"guild_id\""},
 	Enabled:        whereHelperbool{field: "\"genai_configs\".\"enabled\""},
@@ -91,6 +97,7 @@ var GenaiConfigWhere = struct {
 	Model:          whereHelperstring{field: "\"genai_configs\".\"model\""},
 	Key:            whereHelper__byte{field: "\"genai_configs\".\"key\""},
 	BaseCMDEnabled: whereHelperbool{field: "\"genai_configs\".\"base_cmd_enabled\""},
+	MaxTokens:      whereHelperint64{field: "\"genai_configs\".\"max_tokens\""},
 }
 
 // GenaiConfigRels is where relationship names are stored.
@@ -110,9 +117,9 @@ func (*genaiConfigR) NewStruct() *genaiConfigR {
 type genaiConfigL struct{}
 
 var (
-	genaiConfigAllColumns            = []string{"guild_id", "enabled", "provider", "model", "key", "base_cmd_enabled"}
+	genaiConfigAllColumns            = []string{"guild_id", "enabled", "provider", "model", "key", "base_cmd_enabled", "max_tokens"}
 	genaiConfigColumnsWithoutDefault = []string{"guild_id", "enabled", "provider", "model", "key", "base_cmd_enabled"}
-	genaiConfigColumnsWithDefault    = []string{}
+	genaiConfigColumnsWithDefault    = []string{"max_tokens"}
 	genaiConfigPrimaryKeyColumns     = []string{"guild_id"}
 	genaiConfigGeneratedColumns      = []string{}
 )
