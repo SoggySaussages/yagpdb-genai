@@ -66,7 +66,7 @@ func (p GenAIProviderGoogle) getCredentials(credentialsFile string) (projectID s
 
 func (p GenAIProviderGoogle) EstimateTokens(model, combinedInput string, maxTokens int64) (inputEstimatedTokens, outputMaxTokens int64) {
 	inputEstimatedTokens = int64(len(combinedInput) / CharacterCountToTokenRatioOpenAI)
-	outputMaxTokens = maxTokens - inputEstimatedTokens
+	outputMaxTokens = maxTokens - (inputEstimatedTokens / 4)
 	return
 }
 
@@ -162,10 +162,16 @@ func (p GenAIProviderGoogle) ComplexCompletion(model, key string, input *GenAIIn
 		}
 	}
 
+	usage := &GenAIResponseUsage{}
+
 	resp, err := gemini.GenerateContent(context.Background(), prompt)
+	if resp != nil && resp.UsageMetadata.PromptTokenCount != 0 || resp.UsageMetadata.CandidatesTokenCount != 0 {
+		usage.InputTokens = int64(resp.UsageMetadata.PromptTokenCount)
+		usage.OutputTokens = int64(resp.UsageMetadata.CandidatesTokenCount)
+	}
 	if err != nil {
 		logger.Error(err)
-		return nil, nil, fmt.Errorf("error generating content: %w", err)
+		return &GenAIResponse{}, usage, fmt.Errorf("error generating content: %w", err)
 	}
 
 	choice := resp.Candidates[0]
@@ -188,12 +194,9 @@ func (p GenAIProviderGoogle) ComplexCompletion(model, key string, input *GenAIIn
 	}
 
 	return &GenAIResponse{
-			Content:   content,
-			Functions: &functionResponse,
-		}, &GenAIResponseUsage{
-			InputTokens:  int64(resp.UsageMetadata.PromptTokenCount),
-			OutputTokens: int64(resp.UsageMetadata.CandidatesTokenCount),
-		}, nil
+		Content:   content,
+		Functions: &functionResponse,
+	}, usage, nil
 }
 
 func (p GenAIProviderGoogle) ModerateMessage(model, key string, message string) (*GenAIModerationCategoryProbability, *GenAIResponseUsage, error) {

@@ -123,9 +123,15 @@ func (p GenAIProviderAnthropic) ComplexCompletion(model, key string, input *GenA
 
 	client := anthropic.NewClient(option.WithAPIKey(key))
 
+	usage := &GenAIResponseUsage{}
+
 	messageResp, err := client.Messages.New(context.Background(), requestParams)
+	if messageResp != nil && messageResp.Usage.InputTokens != 0 || messageResp.Usage.OutputTokens != 0 {
+		usage.InputTokens = int64(messageResp.Usage.InputTokens)
+		usage.OutputTokens = int64(messageResp.Usage.OutputTokens)
+	}
 	if err != nil {
-		return nil, nil, err
+		return &GenAIResponse{}, usage, err
 	}
 
 	content := messageResp.Content
@@ -145,12 +151,9 @@ func (p GenAIProviderAnthropic) ComplexCompletion(model, key string, input *GenA
 	}
 
 	return &GenAIResponse{
-			Content:   contentString,
-			Functions: &functionResponse,
-		}, &GenAIResponseUsage{
-			InputTokens:  int64(messageResp.Usage.InputTokens),
-			OutputTokens: int64(messageResp.Usage.OutputTokens),
-		}, nil
+		Content:   contentString,
+		Functions: &functionResponse,
+	}, usage, nil
 }
 
 func (p GenAIProviderAnthropic) ModerateMessage(model, key string, message string) (*GenAIModerationCategoryProbability, *GenAIResponseUsage, error) {

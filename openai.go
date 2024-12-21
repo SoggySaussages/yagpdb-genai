@@ -11,6 +11,8 @@ import (
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/shared"
+	"github.com/pkoukk/tiktoken-go"
+	tiktoken_loader "github.com/pkoukk/tiktoken-go-loader"
 )
 
 type GenAIProviderOpenAI struct{}
@@ -59,9 +61,16 @@ func (p GenAIProviderOpenAI) CharacterTokenRatio() int {
 	return CharacterCountToTokenRatioOpenAI
 }
 
-func (p GenAIProviderOpenAI) EstimateTokens(combinedInput string, maxTokens int64) (inputEstimatedTokens, outputMaxTokens int64) {
+var tiktokenBPELoaderSet bool
+
+func (p GenAIProviderOpenAI) EstimateTokens(model, combinedInput string, maxTokens int64) (inputEstimatedTokens, outputMaxTokens int64) {
+	if !tiktokenBPELoaderSet {
+		tiktoken.SetBpeLoader(tiktoken_loader.NewOfflineLoader())
+		tiktokenBPELoaderSet = true
+	}
+
 	inputEstimatedTokens = int64(len(combinedInput) / CharacterCountToTokenRatioOpenAI)
-	outputMaxTokens = maxTokens - inputEstimatedTokens
+	outputMaxTokens = maxTokens - (inputEstimatedTokens / 4)
 	return
 }
 
@@ -136,9 +145,15 @@ func (p GenAIProviderOpenAI) ComplexCompletion(model, key string, input *GenAIIn
 
 	client := openai.NewClient(option.WithAPIKey(key))
 
+	usage := &GenAIResponseUsage{}
+
 	chatCompletion, err := client.Chat.Completions.New(context.Background(), requestParams)
+	if chatCompletion != nil && chatCompletion.Usage.PromptTokens != 0 || chatCompletion.Usage.CompletionTokens != 0 {
+		usage.InputTokens = chatCompletion.Usage.PromptTokens
+		usage.OutputTokens = chatCompletion.Usage.CompletionTokens
+	}
 	if err != nil {
-		return nil, nil, err
+		return nil, usage, err
 	}
 
 	choice := chatCompletion.Choices[0]
@@ -157,12 +172,9 @@ func (p GenAIProviderOpenAI) ComplexCompletion(model, key string, input *GenAIIn
 	}
 
 	return &GenAIResponse{
-			Content:   content,
-			Functions: &functionResponse,
-		}, &GenAIResponseUsage{
-			InputTokens:  int64(chatCompletion.Usage.PromptTokens),
-			OutputTokens: int64(chatCompletion.Usage.CompletionTokens),
-		}, nil
+		Content:   content,
+		Functions: &functionResponse,
+	}, usage, nil
 }
 
 func (p GenAIProviderOpenAI) ModerateMessage(model, key string, message string) (*GenAIModerationCategoryProbability, *GenAIResponseUsage, error) {
@@ -173,9 +185,12 @@ func (p GenAIProviderOpenAI) ModerateMessage(model, key string, message string) 
 
 	client := openai.NewClient(option.WithAPIKey(key))
 
+	inputUse, _ := p.EstimateTokens(openai.ModerationModelOmniModerationLatest, message, 0)
+	usage := &GenAIResponseUsage{InputTokens: inputUse}
+
 	moderation, err := client.Moderations.New(context.Background(), moderationParams)
 	if err != nil {
-		return nil, nil, err
+		return nil, usage, err
 	}
 
 	response := GenAIModerationCategoryProbability{}
@@ -197,7 +212,7 @@ func (p GenAIProviderOpenAI) ModerateMessage(model, key string, message string) 
 		response[category] = score
 	}
 
-	return &response, &GenAIResponseUsage{}, nil
+	return &response, usage, nil
 }
 
 var GenAIProviderOpenAIWebData = &GenAIProviderWebDescriptions{
