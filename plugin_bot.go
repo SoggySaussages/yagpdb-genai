@@ -33,6 +33,7 @@ func (p *Plugin) AddCommands() {
 }
 
 func (p *Plugin) BotInit() {
+	setProvidersGlobalConfigs()
 	generateFormattedModCategoryList()
 	genCustomModerateFuncArgs()
 
@@ -309,5 +310,24 @@ func getAPIToken(gs *dstate.GuildState) (*models.GenaiConfig, string, error) {
 		return config, "", ErrorNoAPIKey
 	}
 
-	return decryptAPIToken(gs, config.Key)
+	key, err := decryptAPIToken(gs, config.Key)
+	return config, key, err
+}
+
+// lists all the providers supported by the plugin
+func ListProviders() (providers []string) {
+	for _, p := range GenAIProviders {
+		providers = append(providers, p.String())
+	}
+	return
+}
+
+// lists all the providers permitted by the global config
+func ListConfiguredProviders() (providers []string) {
+	for _, p := range GenAIProviders {
+		if strings.Contains(confProvidersEnabled.GetString(), p.String()) || p.ID() == GenAIProviderID(confProvidersOverride.GetInt()) {
+			providers = append(providers, p.String())
+		}
+	}
+	return
 }

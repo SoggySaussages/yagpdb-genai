@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/SoggySaussages/yagpdb-genai/models"
 	"github.com/botlabs-gg/yagpdb/v2/commands"
 	"github.com/botlabs-gg/yagpdb/v2/common"
+	"github.com/botlabs-gg/yagpdb/v2/common/config"
 	"github.com/botlabs-gg/yagpdb/v2/common/featureflags"
 	"github.com/botlabs-gg/yagpdb/v2/lib/dstate"
 )
@@ -35,6 +37,15 @@ func RegisterPlugin() {
 	plugin := &Plugin{}
 	common.RegisterPlugin(plugin)
 }
+
+var (
+	confDefaultEnable           = config.RegisterOption("yagpdb.genai.default_enabled", "Enable AI on each guild by default", false)
+	confProvidersEnabled        = config.RegisterOption("yagpdb.genai.providers.enabled", "Set providers permitted to be set per-guild", strings.Join(ListProviders(), ","))
+	confProvidersOverride       = config.RegisterOption("yagpdb.genai.providers.override", "Set global AI provider and prevent guild-level configuration to switch providers.", "")
+	confDefaultBaseCMDEnabled   = config.RegisterOption("yagpdb.genai.default_base_cmd_enabled", "Enable the base genai command on each by default", false)
+	confMaxMonthlyTokens        = config.RegisterOption("yagpdb.genai.max_monthly_tokens", "Set the max monthly tokens per guild when using global API key, or -1 for no limit", int64(1024))
+	confMaxMonthlyTokensPremium = config.RegisterOption("yagpdb.genai.max_monthly_tokens.premium", "Set the max monthly tokens per premium guild when using global API key, or -1 for no limit", int64(1024))
+)
 
 var _ featureflags.PluginWithFeatureFlags = (*Plugin)(nil)
 
@@ -95,6 +106,11 @@ const (
 )
 
 type GenAIProviderModelMap map[string]string
+
+type GenAIProviderGlobalConfig struct {
+	Key   []byte
+	Model string
+}
 
 type GenAIFunctionDefinition struct {
 	Name        string
@@ -187,6 +203,7 @@ type GenAIProvider interface {
 	DefaultModel() string
 	ModelMap() *GenAIProviderModelMap
 	KeyRequired() bool
+	GlobalConfig() *GenAIProviderGlobalConfig
 
 	CharacterTokenRatio() int
 	EstimateTokens(model, combinedInput string, maxTokens int64) (inputEstimatedTokens, outputMaxCharacters int64)
@@ -200,6 +217,47 @@ type GenAIProvider interface {
 
 var GenAIProviders = []GenAIProvider{GenAIProviderOpenAI{}, GenAIProviderGoogle{}, GenAIProviderAnthropic{}}
 
+func setProvidersGlobalConfigs() {
+	for _, p := range GenAIProviders {
+		var modelsList []string
+		for _, v := range *p.ModelMap() {
+			modelsList = append(modelsList, v)
+		}
+		models := config.RegisterOption(fmt.Sprintf("yagpdb.genai.providers.%s.allowed_models", p.String()), fmt.Sprintf("List of %s models available for guild-level configuration.", p.String()), strings.Join(modelsList, ","))
+		modelOverride := config.RegisterOption(fmt.Sprintf("yagpdb.genai.providers.%s.model_override", p.String()), fmt.Sprintf("Model to override for %s and prohibit guild-level configuration.", p.String()), "")
+		keyOverrideDesc := fmt.Sprintf("Key to override for %s and prohibit guild-level configuration.", p.String())
+		if p.ID() == GenAIProviderGoogleID {
+			keyOverrideDesc = fmt.Sprintf("Override key for %[1]s with your %[1]s credentials.json file and prohibit guild-level configuration.", p.String(), "")
+		}
+		keyOverride := config.RegisterOption(fmt.Sprintf("yagpdb.genai.providers.%s.key_override", p.String()), keyOverrideDesc, "")
+
+		globalConf := GenAIProviderGlobalConfig{}
+		if modelOverride.GetString() != "" {
+			globalConf.Model = p.DefaultModel()
+			for _, v := range *p.ModelMap() {
+				if strings.ToLower(modelOverride.GetString()) == v {
+					globalConf.Model = v
+				}
+			}
+		}
+		if keyOverride.GetString() != "" {
+			key, _ := encryptAPIToken(&dstate.GuildState{ID: common.BotApplication.ID, OwnerID: common.BotApplication.Owner.ID}, keyOverride.GetString())
+			globalConf.Key = key
+		}
+
+		*(p.GlobalConfig()) = globalConf
+
+		newModelMap := GenAIProviderModelMap{}
+		existingModelMap := p.ModelMap()
+		for k, v := range *existingModelMap {
+			if strings.Contains(models.GetString(), v) {
+				newModelMap[k] = v
+			}
+		}
+		*existingModelMap = newModelMap
+	}
+}
+
 var DefaultConfig = models.GenaiConfig{
 	Enabled:  false,
 	Provider: int(GenAIProviders[0].ID()),
@@ -208,11 +266,38 @@ var DefaultConfig = models.GenaiConfig{
 
 // Returns the guild's conifg, or the default one if not set
 func GetConfig(guildID int64) (*models.GenaiConfig, error) {
+	var globalProvider *GenAIProvider
+	if confProvidersOverride.GetString() != "" {
+		for _, p := range GenAIProviders {
+			if strings.ToLower(p.String()) == strings.ToLower(confProvidersOverride.GetString()) {
+				globalProvider = &p
+				break
+			}
+		}
+		if globalProvider == nil {
+			globalProvider = &GenAIProviders[0]
+		}
+	}
+
 	config, err := models.GenaiConfigs(
 		models.GenaiConfigWhere.GuildID.EQ(guildID)).OneG(context.Background())
 	if err == sql.ErrNoRows {
-		confCopy := DefaultConfig
-		return &confCopy, nil
+		prov := GenAIProviders[0]
+		if globalProvider != nil {
+			prov = *globalProvider
+		}
+		return &models.GenaiConfig{
+			GuildID:        guildID,
+			Enabled:        confDefaultEnable.GetBool(),
+			Provider:       int(prov.ID()),
+			Model:          prov.DefaultModel(),
+			Key:            prov.GlobalConfig().Key,
+			BaseCMDEnabled: confDefaultBaseCMDEnabled.GetBool(),
+		}, nil
+	}
+
+	if globalProvider != nil {
+		config.Provider = int((*globalProvider).ID())
 	}
 
 	return config, err

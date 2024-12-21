@@ -10,7 +10,6 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
-	"github.com/botlabs-gg/yagpdb/v2/lib/dstate"
 )
 
 type GenAIProviderAnthropic struct{}
@@ -41,6 +40,12 @@ func (p GenAIProviderAnthropic) ModelMap() *GenAIProviderModelMap {
 
 func (p GenAIProviderAnthropic) KeyRequired() bool {
 	return true
+}
+
+var globalConfigAnthropic = &GenAIProviderGlobalConfig{}
+
+func (p GenAIProviderAnthropic) GlobalConfig() *GenAIProviderGlobalConfig {
+	return globalConfigAnthropic
 }
 
 // ~ accurate for English text as of Dec 2024

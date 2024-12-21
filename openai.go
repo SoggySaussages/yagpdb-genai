@@ -46,6 +46,12 @@ func (p GenAIProviderOpenAI) KeyRequired() bool {
 	return true
 }
 
+var globalConfigGenAI = &GenAIProviderGlobalConfig{}
+
+func (p GenAIProviderOpenAI) GlobalConfig() *GenAIProviderGlobalConfig {
+	return globalConfigGenAI
+}
+
 // ~ accurate for English text as of Dec 2024
 const CharacterCountToTokenRatioOpenAI = 4 / 1
 

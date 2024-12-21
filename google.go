@@ -41,6 +41,12 @@ func (p GenAIProviderGoogle) KeyRequired() bool {
 	return true
 }
 
+var globalConfigGoogle = &GenAIProviderGlobalConfig{}
+
+func (p GenAIProviderGoogle) GlobalConfig() *GenAIProviderGlobalConfig {
+	return globalConfigGoogle
+}
+
 // ~ accurate as of Dec 2024
 const CharacterCountToTokenRatioGoogle = 4 / 1
 
