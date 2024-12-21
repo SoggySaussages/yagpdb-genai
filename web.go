@@ -61,8 +61,6 @@ type CommandFormData struct {
 	RolesWhitelistMode      bool
 }
 
-const SidebarCategoryGenAI = "Generative AI"
-
 const (
 	ConextKeyConfig ConextKey = iota
 )
@@ -71,7 +69,7 @@ var panelLogKey = cplogs.RegisterActionFormat(&cplogs.ActionFormat{Key: "genai_s
 
 func (p *Plugin) InitWeb() {
 	web.AddHTMLTemplate("genai/assets/genai.html", PageHTML)
-	web.AddSidebarItem(SidebarCategoryGenAI, &web.SidebarItem{
+	web.AddSidebarItem(web.SidebarCategoryGenAI, &web.SidebarItem{
 		Name: "General",
 		URL:  "genai",
 		Icon: "fas fa-cog",
@@ -93,7 +91,7 @@ func (p *Plugin) InitWeb() {
 	genaiMux.Handle(pat.Post("/"), web.FormParserMW(web.RenderHandler(HandlePostGenAI, "cp_genai"), FormData{}))
 
 	web.AddHTMLTemplate("genai/assets/genai_commands.html", CommandsPageHTML)
-	web.AddSidebarItem(SidebarCategoryGenAI, &web.SidebarItem{
+	web.AddSidebarItem(web.SidebarCategoryGenAI, &web.SidebarItem{
 		Name: "Commands",
 		URL:  "genai/commands",
 		Icon: "fas fa-terminal",
@@ -111,10 +109,6 @@ func (p *Plugin) InitWeb() {
 
 	genaiMux.Handle(pat.Post("/commands/:commandID/delete"),
 		web.ControllerPostHandler(CommandMiddleware(HandleDeleteCommand), getHandler, nil))
-}
-
-type configurableValues struct {
-	Provider, Model, Key bool
 }
 
 // Adds the current config to the context
