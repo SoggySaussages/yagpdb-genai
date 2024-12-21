@@ -1,12 +1,15 @@
 package genai
 
 import (
+	"context"
+	"strconv"
 	"strings"
 
 	"github.com/botlabs-gg/yagpdb/v2/automod"
 	"github.com/botlabs-gg/yagpdb/v2/bot"
 	"github.com/botlabs-gg/yagpdb/v2/lib/discordgo"
 	"github.com/botlabs-gg/yagpdb/v2/lib/dstate"
+	"github.com/volatiletech/sqlboiler/v4/boil"
 )
 
 type GenAIAutomodTriggerData struct {
@@ -80,6 +83,25 @@ func (mc *GenAIAutomodTrigger) CheckMessage(triggerCtx *automod.TriggerContext, 
 	}
 
 	provider := GenAIProviderFromID(config.Provider)
+
+	if config.OwnerIDAutomodNotified != triggerCtx.GS.OwnerID {
+		sent := true
+		alertMsg := "Heads up: YAGPDB just used Generative AI to analyze its first message on your server for abuse. It's important to notify all of your users (preferably in a join DM as well as a prominent channel message in your server) that messages they send may be forwarded to " + provider.String() + " for AI analysis."
+		err := bot.SendDM(triggerCtx.GS.OwnerID, alertMsg)
+		if err != nil {
+			permsOk, _, err := bot.SendMessage(cs.GuildID, cs.ID, "<@"+strconv.FormatInt(triggerCtx.GS.OwnerID, 10)+"> "+alertMsg)
+			if !permsOk {
+				permsOk, _, err = bot.SendMessage(cs.GuildID, cs.GuildID, "<@"+strconv.FormatInt(triggerCtx.GS.OwnerID, 10)+"> "+alertMsg)
+			}
+			if !permsOk || err != nil {
+				sent = false
+			}
+		}
+		if sent {
+			config.OwnerIDAutomodNotified = triggerCtx.GS.OwnerID
+			config.UpdateG(context.Background(), boil.Whitelist("owner_id_automod_notified"))
+		}
+	}
 
 	g := bot.State.GetGuild(cs.GuildID)
 	if g == nil {

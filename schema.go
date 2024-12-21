@@ -17,6 +17,8 @@ ALTER TABLE genai_configs ADD COLUMN IF NOT EXISTS month_token_usage_to_date BIG
 `, `
 ALTER TABLE genai_configs ADD COLUMN IF NOT EXISTS token_usage_last_reset DATE NOT NULL DEFAULT '0001-01-01';
 `, `
+ALTER TABLE genai_configs ADD COLUMN IF NOT EXISTS owner_id_automod_notified BIGINT NOT NULL DEFAULT 0;
+`, `
 CREATE TABLE IF NOT EXISTS genai_commands (
 	id BIGINT NOT NULL,
 	guild_id BIGINT NOT NULL,
